@@ -131,6 +131,23 @@ function redige(historique, dernier) {
     if (reponses >= MAX_REPS) { log('plafond de reponses atteint, arret'); break; }
 
     try {
+      // 1) sonder SANS ouvrir la conversation : "chats" ne marque rien comme lu et ne vole pas
+      // la conversation ouverte aux autres outils qui pilotent la meme app.
+      const liste = JSON.parse(wa(['chats', '25']));
+      const ligne = liste.find && liste.find(c => (c.name || '').toLowerCase().includes(CONTACT.toLowerCase()));
+      if (!ligne) { log(`contact "${CONTACT}" absent de la liste visible, on repasse plus tard`); await dors(PERIODE); continue; }
+
+      const empreinte = `${ligne.time}|${ligne.preview}`;
+      const rienDeNeuf = empreinte === etat.apercu;
+      const cEstMoi = etat.dernierEnvoi && ligne.preview.startsWith(etat.dernierEnvoi.slice(0, 40));
+      if (rienDeNeuf || cEstMoi) {
+        if (!rienDeNeuf) { etat.apercu = empreinte; etatEcrit(etat); }
+        await dors(PERIODE);
+        continue;
+      }
+      etat.apercu = empreinte;
+
+      // 2) seulement maintenant, ouvrir pour lire le detail et repondre
       const ouverte = JSON.parse(wa(['read', '1'])).conversation || '';
       if (!ouverte.toLowerCase().includes(CONTACT.toLowerCase())) { wa(['open', CONTACT]); await dors(2500); }
 
@@ -155,6 +172,7 @@ function redige(historique, dernier) {
             const apres = JSON.parse(wa(['read', '2']));
             const vu = (apres.messages || []).some(m => m.texte.includes(reponse.slice(0, 30)));
             log(`${vu ? 'ENVOYE et relu' : 'ENVOI NON CONFIRME'} : ${reponse}`);
+            etat.dernierEnvoi = reponse; etatEcrit(etat);
             if (SENSIBLE.test(dernier.texte)) log('  ^ sujet sensible, a relire');
             reponses++;
           }
