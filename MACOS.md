@@ -83,3 +83,52 @@ l'apercu, ou `node wa.js read 3`). Cette regle vaut pour le texte comme pour les
   blob : le decodage se fait hors de la page. Passer par le menu contextuel puis "Save as".
 - Les videos ne se reperent pas de facon fiable dans le fil. Passer par le panneau Contact info
   puis "Media, links and docs" : les vignettes portant une duree sont les videos.
+
+---
+
+## Teste en reel sur un Mac mini M4, macOS 27, le 07/10/2026
+
+Verifie a distance via Tailscale, pas deduit.
+
+**1. WhatsApp.app est bien natif, sans moteur Chromium.** Preuve :
+
+```
+$ ls /Applications/WhatsApp.app/Contents/Frameworks
+SharedModules.framework
+WAAppKitBridge.framework
+$ find /Applications/WhatsApp.app -iname "*Electron*" -o -iname "*Chromium*" -o -iname "*CEF*"
+(aucun resultat)
+$ file /Applications/WhatsApp.app/Contents/MacOS/WhatsApp
+Mach-O universal binary [x86_64] [arm64]
+```
+
+Donc le chemin Windows (port de debogage WebView2) n'existe pas sur macOS. Confirme.
+
+**2. La voie Chrome marche.** Chrome 154 lance avec `--remote-debugging-port=9222` et un profil
+dedie, l'onglet est detecte par le CLI :
+
+```
+$ curl -s http://127.0.0.1:9222/json/list | grep whatsapp
+"url": "https://web.whatsapp.com/"
+```
+
+**3. Le CLI pilote reellement ce Chrome.** Teste depuis un autre poste a travers un tunnel SSH
+(`ssh -L 9223:127.0.0.1:9222`), donc sans rien installer sur le Mac :
+
+```
+$ WA_PORT=9223 node js.js "..."
+{"url":"https://web.whatsapp.com/","titre":"WhatsApp","paneSide":false,"qr":true}
+$ WA_PORT=9223 node wa.js chats 5
+{ "error": "liste des chats non chargee" }
+```
+
+L'erreur est la bonne reponse : le profil etait neuf, donc la page affichait le QR code et il n'y
+avait aucune conversation. Le CLI a bien trouve la cible, evalue du JS dans la page et renvoye un
+diagnostic correct.
+
+**Ce qui reste a faire sur le Mac, et seulement par son proprietaire :** installer Node 22
+(absent, et `brew` aussi), lancer `./wa-start.sh`, scanner le QR une fois. Ensuite tout le CLI
+fonctionne tel quel.
+
+**`WA_PORT` est pris en charge partout** : le CLI peut donc piloter un Chrome distant a travers un
+tunnel SSH, ce qui evite d'installer quoi que ce soit sur la machine cible.
