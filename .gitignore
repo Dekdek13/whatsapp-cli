@@ -1,0 +1,22 @@
+# Jamais de contenu de conversation dans le depot.
+*.ogg
+*.mp4
+*.mov
+*.m4a
+*.mp3
+*.jpg
+*.jpeg
+*.png
+*.webp
+*.txt
+transcriptions.md
+vocaux-*/
+videos-*/
+medias-*/
+test-*/
+
+# Divers
+node_modules/
+__pycache__/
+.DS_Store
+Thumbs.db
