@@ -120,3 +120,38 @@ voir [MACOS.md](MACOS.md).
 
 Le `.gitignore` bloque medias, transcriptions et dossiers d'export. **Le code oui, les
 conversations jamais.** Les exports vont ailleurs que dans ce dossier.
+
+## Reponse automatique a un contact
+
+```bash
+node auto-reply.js "Maman"                                  # boucle par defaut
+node auto-reply.js "Alexandre" --periode 30 --max 10 --heures 4
+node auto-reply.js "Maman" --consigne "Tres bref, tutoiement."
+node auto-reply.js "Maman" --sec                            # redige mais N'ENVOIE PAS
+```
+
+Lit le fil toutes les N secondes, detecte tout nouveau message entrant, redige la reponse avec
+`claude -p` en Sonnet, l'envoie, puis **relit le fil pour verifier qu'elle est bien partie**.
+
+C'est **le seul endroit du CLI ou un message part sans go explicite a chaque fois**. A n'activer
+que sur une conversation ou l'utilisateur l'a demande, et apres avoir prevenu l'interlocuteur
+qu'il parle a un assistant.
+
+Garde-fous : plafond de reponses (`--max`), duree maximale (`--heures`), arret immediat en creant
+`<Downloads>\STOP-<CONTACT>`, journal horodate dans `<Downloads>\auto-reply-<contact>.log`, et sur
+les sujets sensibles (argent, dettes, juridique) la reponse reste chaleureuse mais **ne s'engage
+sur rien** et la ligne est marquee dans le journal.
+
+### Il n'y a pas de webhook
+
+Meta ne fournit de webhook que pour les numeros business sur l'API Cloud, pas pour un compte
+personnel. Lire le fil en boucle est le seul signal fiable, et il l'est : latence mesuree entre
+13 et 40 secondes, aucun message manque.
+
+### Deux pieges payes sur cette boucle
+
+- Sur Windows, `claude` dans le PATH est un **shim shell** que `child_process` ne sait pas lancer :
+  `spawnSync claude ENOENT`. Il faut viser le vrai `claude.exe` (voir `trouveClaude()`).
+- Donner 8 messages de contexte sans dire **auquel** repondre fait deriver le moteur : il a repondu
+  a un message vieux de trois jours. Le dernier message doit etre isole et marque comme le seul
+  auquel repondre.
