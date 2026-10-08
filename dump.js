@@ -58,7 +58,8 @@ const clickChat = (name) => {
   return true;
 };
 
-const header = () => (document.querySelector('#main header')?.innerText || '').split('\n')[0] || '';
+// l'en-tete peut commencer par les initiales de l'avatar ("RG\nRomain C Guidotti") : on garde tout le texte
+const header = () => document.querySelector('#main header')?.innerText || '';
 
 // WhatsApp ne garde que ~100 lignes dans le DOM (liste virtualisee) : on lit a chaque cran
 // en remontant, et on dedoublonne par data-id. Ordre final : du plus ancien au plus recent.
@@ -133,7 +134,9 @@ const harvest = async (tours, ME) => {
       if (ok === 'skip') continue;
       if (!ok) { bilan.introuvables.push(conv.name); continue; }
       await sleep(1500);
-      if ((await ev(header)) !== conv.name) { bilan.introuvables.push(conv.name + ' (en-tete different)'); continue; }
+      // l'en-tete perd les emojis (rendus en <img>) : comparer lettres et chiffres seulement
+      const lettres = s => s.normalize('NFKD').replace(/[^\p{L}\p{N}]/gu, '').toLowerCase();
+      if (!lettres(await ev(header)).includes(lettres(conv.name))) { bilan.introuvables.push(conv.name + ' (en-tete different)'); continue; }
       const msgs = await ev(harvest, tours, ME);
       fs.writeFileSync(fichier, JSON.stringify({ conversation: conv.name, messages: msgs }, null, 1));
       bilan.exportes.push(conv.name);

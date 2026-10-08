@@ -6,6 +6,8 @@ Piloter WhatsApp en ligne de commande, pour qu'un assistant puisse **lire** les 
 Zero dependance : le CLI parle au moteur Chromium qui affiche WhatsApp, via le protocole CDP,
 avec le `WebSocket` natif de Node 22.
 
+- **Avant d'ecrire au nom de l'utilisateur** : lire `VOIX.md` s'il existe (sa facon d'ecrire selon la personne ;
+  fichier personnel, ignore par Git, donc absent du depot public)
 - **Installation** : voir [INSTALL.md](INSTALL.md)
 - **Portage macOS** : voir [MACOS.md](MACOS.md), ecrit pour l'assistant qui reprend le code
 
