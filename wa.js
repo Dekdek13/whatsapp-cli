@@ -283,6 +283,48 @@ const arg = rest.join(' ');
       out = await evaluate(ws, F.sendNow);
       break;
     }
+    case 'wait': {
+      // Mode conversation : attend le prochain message entrant de <nom> et le rend, puis s'arrete.
+      // L'agent redige la reponse, l'envoie (draft + send), et relance wait. Rien ne part tout seul.
+      // Si l'utilisateur ouvre une autre conversation entre-temps, on rouvre <nom>.
+      const nums = rest.filter(x => /^\d+$/.test(x));
+      const secondes = parseInt(nums[nums.length - 1]) || 120;
+      const nom = rest.filter(x => x !== nums[nums.length - 1]).join(' ');
+      if (!nom) { out = { ok: false, error: 'usage : wait <nom> [secondes]' }; break; }
+      const lettres = s => s.normalize('NFKD').replace(/[^\p{L}\p{N}]/gu, '').toLowerCase();
+      const ME = process.env.WA_ME || 'Yanis';
+      const cle = m => [m.date, m.heure, m.auteur, m.texte].join('|');
+      const pause = ms => new Promise(r => setTimeout(r, ms));
+      const assure = async () => {
+        const h = await evaluate(ws, () => document.querySelector('#main header')?.innerText || '');
+        if (lettres(h).includes(lettres(nom))) return true;
+        await evaluate(ws, () => { const p = document.querySelector('#pane-side'); if (p) p.scrollTop = 0; });
+        await pause(800);
+        await evaluate(ws, F.open, nom);
+        await pause(1500);
+        return lettres(await evaluate(ws, () => document.querySelector('#main header')?.innerText || '')).includes(lettres(nom));
+      };
+      if (!await assure()) { out = { ok: false, error: `conversation "${nom}" introuvable` }; break; }
+      const deja = new Set((await evaluate(ws, F.read, 200, ME)).messages.map(cle));
+      const fin = Date.now() + secondes * 1000;
+      out = { ok: true, conversation: nom, timeout: true, nouveaux: [] };
+      while (Date.now() < fin) {
+        await pause(3000);
+        if (!await assure()) continue;
+        await evaluate(ws, F.expand);
+        const r = await evaluate(ws, F.read, 200, ME);
+        const neufs = r.messages.filter(m => !m.sortant && !deja.has(cle(m)));
+        if (neufs.length) {
+          await pause(4000); // il tape souvent en plusieurs bulles : on laisse arriver la suite
+          const r2 = await evaluate(ws, F.read, 200, ME);
+          out.nouveaux = r2.messages.filter(m => !m.sortant && !deja.has(cle(m)))
+            .map(m => ({ heure: m.heure, auteur: m.auteur || '(vocal ou media)', texte: m.texte }));
+          out.timeout = false;
+          break;
+        }
+      }
+      break;
+    }
     case 'vocaux': out = await evaluate(ws, F.pttList); break;
     case 'grab': {
       const fs = await import('node:fs');
@@ -310,7 +352,7 @@ const arg = rest.join(' ');
       out = { fichier: p, octets: fs.statSync(p).size }; break;
     }
     default:
-      out = { usage: ['chats [n]', 'open <nom>', 'read [n]', 'scroll [tours]', 'draft <texte>', 'send (WA_GO=oui)', 'shot [fichier.png]'] };
+      out = { usage: ['chats [n]', 'open <nom>', 'read [n]', 'scroll [tours]', 'draft <texte>', 'send (WA_GO=oui)', 'wait <nom> [secondes]', 'shot [fichier.png]'] };
   }
   console.log(JSON.stringify(out, null, 2));
   ws.close();

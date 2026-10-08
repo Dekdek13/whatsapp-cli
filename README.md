@@ -48,6 +48,8 @@ node wa.js draft --file msg.txt     # message multi-ligne depuis un fichier UTF-
                                     # "1. " converti en "1)" sinon WhatsApp renumerote ; ok=false si lignes != <p>)
 node wa.js clear                    # vide la zone de saisie, SANS envoyer
 WA_GO=oui node wa.js send           # envoie le brouillon en place
+node wa.js wait "Yassine" 170       # attend le prochain message entrant (170 s max) et le rend, puis s'arrete ;
+                                    # rouvre la conversation si l'utilisateur en a ouvert une autre
 node wa.js shot sortie.png          # capture de la fenetre
 
 node dump.js liste liste.json       # toutes les conversations (nom, date, non lus), sans rien ouvrir
@@ -70,6 +72,20 @@ explicite de l'utilisateur, a chaque fois**. Le flux correct est `open` puis `dr
 
 Et surtout : **ne jamais annoncer un envoi sans avoir relu le fil ensuite**. Le script d'envoi de
 media a affiche "envoye" deux fois alors que rien n'etait parti.
+
+## Mode conversation (repondre tac au tac)
+
+Quand l'utilisateur demande a l'assistant de tenir une conversation pendant N minutes :
+
+1. noter l'heure de fin ;
+2. `node wa.js wait "<nom>" 170` : rend `nouveaux` (les messages entrants arrives depuis l'appel,
+   apres 4 s de grace pour les bulles qui suivent) ou `timeout: true` ;
+3. rediger la reponse, `draft`, verifier l'en-tete, `WA_GO=oui node wa.js send` ;
+4. relancer `wait` jusqu'a l'heure de fin, ou jusqu'a ce que l'utilisateur dise stop.
+
+La demande de l'utilisateur vaut go pour toute la duree annoncee, et pour cette conversation
+seulement. `wait` n'envoie jamais rien : c'est l'assistant qui redige et envoie chaque reponse.
+Pour une reponse sans assistant aux commandes, voir `auto-reply.js` plus bas.
 
 ## Vocaux : ne jamais les jouer
 
