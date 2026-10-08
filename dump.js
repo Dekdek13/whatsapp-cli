@@ -76,7 +76,12 @@ const harvest = async (tours, ME) => {
       const id = r.querySelector('[data-id]')?.getAttribute('data-id') || cp.getAttribute('data-pre-plain-text') + cp.innerText.slice(0, 40);
       if (seen.has(id)) continue;
       const m = (cp.getAttribute('data-pre-plain-text') || '').match(/^\[(.*?),\s*(.*?)\]\s*(.*?):\s*$/);
-      const texte = (cp.innerText || '').replace(/‎/g, '').trim();
+      // les emojis sont des <img alt="😂"> : innerText les perd, on clone en les remplacant par leur alt
+      const clone = cp.cloneNode(true);
+      clone.querySelectorAll('img[alt]').forEach(i => i.replaceWith(document.createTextNode(i.getAttribute('data-plain-text') || i.alt)));
+      document.body.appendChild(clone); clone.style.cssText = 'position:fixed;left:-9999px;white-space:pre-wrap';
+      const texte = (clone.innerText || '').replace(/‎/g, '').trim();
+      clone.remove();
       if (!texte) continue;
       const auteur = m ? m[3] : '';
       batch.push([id, { date: m ? m[2] : '', heure: m ? m[1] : '', auteur, moi: auteur === ME || !!r.querySelector('[data-icon="tail-out"]'), texte }]);
