@@ -93,7 +93,7 @@ const F = {
     return { ok: true, deplies: n };
   },
 
-  read: (limit) => {
+  read: (limit, ME) => {
     const main = document.querySelector('#main');
     if (!main) return { error: 'aucune conversation ouverte' };
     const header = (main.querySelector('header')?.innerText || '').split('\n')[0] || '';
@@ -103,7 +103,8 @@ const F = {
       const cp = r.querySelector('[data-pre-plain-text]');
       const meta = cp?.getAttribute('data-pre-plain-text') || '';
       const m = meta.match(/^\[(.*?),\s*(.*?)\]\s*(.*?):\s*$/);
-      const sortant = !!r.querySelector('.message-out');
+      // L'app Windows n'a plus la classe .message-out : on se fie aussi a l'auteur (WA_ME, defaut "Yanis").
+      const sortant = !!r.querySelector('.message-out, [data-icon="tail-out"]') || (!!m && m[3] === ME);
       const bubble = r.querySelector('.message-in, .message-out') || r;
       let texte = cp ? cp.innerText : bubble.innerText;
       texte = (texte || '').replace(/‎/g, '').trim();
@@ -192,6 +193,19 @@ const F = {
     return box ? box.innerText.replace(/\n$/, '') : null;
   },
 
+  // Une ligne = un <p> dans la zone de saisie (innerText double les sauts, ne pas s'y fier).
+  composerLines: () => {
+    const box = document.querySelector('#main footer div[contenteditable="true"]');
+    return box ? box.querySelectorAll('p').length : 0;
+  },
+
+  clearComposer: () => {
+    const box = document.querySelector('#main footer div[contenteditable="true"]');
+    if (!box) return { ok: false, error: 'zone de saisie introuvable' };
+    box.focus();
+    return { ok: true };
+  },
+
   sendNow: () => {
     const box = document.querySelector('#main footer div[contenteditable="true"]');
     if (!box) return { ok: false, error: 'zone de saisie introuvable' };
@@ -221,14 +235,45 @@ const arg = rest.join(' ');
     case 'chats':  out = await evaluate(ws, F.chats, parseInt(arg) || 20); break;
     case 'open':   out = await evaluate(ws, F.open, arg); break;
     case 'expand': out = await evaluate(ws, F.expand); break;
-    case 'read':   await evaluate(ws, F.expand); out = await evaluate(ws, F.read, parseInt(arg) || 30); break;
+    case 'read':   await evaluate(ws, F.expand); out = await evaluate(ws, F.read, parseInt(arg) || 30, process.env.WA_ME || "Yanis"); break;
     case 'scroll': out = await evaluate(ws, F.scroll, parseInt(arg) || 3); break;
     case 'draft': {
       const f = await evaluate(ws, F.focusComposer);
       if (!f.ok) { out = f; break; }
-      await send(ws, 'Input.insertText', { text: arg });
+      // Texte multi-ligne : `draft --file msg.txt` (ou "\n" dans l'argument).
+      let texte = rest[0] === '--file'
+        ? (await import('node:fs')).readFileSync(rest[1], 'utf8')
+        : arg.replace(/\\n/g, '\n');
+      texte = texte.replace(/\r/g, '').replace(/\n+$/, '');
+      // "1. " declenche la liste auto de WhatsApp, qui renumerote la ligne suivante ("2. 2.").
+      const lignes = texte.split('\n').map(l => l.replace(/^(\s*\d+)\. /, '$1) '));
+      const shiftEntree = { key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13, modifiers: 8 };
+      for (let i = 0; i < lignes.length; i++) {
+        if (lignes[i]) await send(ws, 'Input.insertText', { text: lignes[i] });
+        if (i < lignes.length - 1) {
+          await send(ws, 'Input.dispatchKeyEvent', { type: 'rawKeyDown', ...shiftEntree });
+          await send(ws, 'Input.dispatchKeyEvent', { type: 'keyUp', ...shiftEntree });
+        }
+      }
       await new Promise(r => setTimeout(r, 300));
-      out = { ok: true, avant: f.avant.replace(/\n$/, ''), brouillon: await evaluate(ws, F.composer) };
+      const nbLignes = await evaluate(ws, F.composerLines);
+      out = { ok: nbLignes === lignes.length, lignes_attendues: lignes.length, lignes_zone: nbLignes,
+              avant: f.avant.replace(/\n$/, ''), brouillon: await evaluate(ws, F.composer) };
+      if (!out.ok) out.error = 'nombre de lignes different : verifier le brouillon avant tout envoi';
+      break;
+    }
+    case 'clear': {
+      // Vide la zone de saisie (Ctrl+A puis Retour arriere). N'envoie rien.
+      const c = await evaluate(ws, F.clearComposer);
+      if (!c.ok) { out = c; break; }
+      for (const k of [{ key: 'a', code: 'KeyA', windowsVirtualKeyCode: 65, modifiers: 2 },
+                       { key: 'Backspace', code: 'Backspace', windowsVirtualKeyCode: 8 }]) {
+        await send(ws, 'Input.dispatchKeyEvent', { type: 'rawKeyDown', ...k });
+        await send(ws, 'Input.dispatchKeyEvent', { type: 'keyUp', ...k });
+      }
+      await new Promise(r => setTimeout(r, 300));
+      const reste = await evaluate(ws, F.composer);
+      out = { ok: !reste || !reste.trim(), reste };
       break;
     }
     case 'send': {

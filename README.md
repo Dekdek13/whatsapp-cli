@@ -41,9 +41,16 @@ node wa.js open "Alexandre"         # ouvre une conversation
 node wa.js read 30                  # lit les N derniers messages (deplie les "Read more")
 node wa.js expand                   # deplie seulement les messages tronques
 node wa.js scroll 5                 # remonte l'historique de N crans
-node wa.js draft "texte"            # ecrit dans la zone de saisie, SANS envoyer
+node wa.js draft "texte"            # ecrit dans la zone de saisie, SANS envoyer ("\n" = saut de ligne)
+node wa.js draft --file msg.txt     # message multi-ligne depuis un fichier UTF-8 (Shift+Entree entre les lignes,
+                                    # "1. " converti en "1)" sinon WhatsApp renumerote ; ok=false si lignes != <p>)
+node wa.js clear                    # vide la zone de saisie, SANS envoyer
 WA_GO=oui node wa.js send           # envoie le brouillon en place
 node wa.js shot sortie.png          # capture de la fenetre
+
+node dump.js liste liste.json       # toutes les conversations (nom, date, non lus), sans rien ouvrir
+node dump.js export liste.json out/ 20   # exporte chaque conversation SANS non lus (20 crans d'historique)
+                                    # en JSON ; ne jamais versionner les exports
 
 node grab.js <dossier> vocaux       # tous les vocaux charges de la conversation ouverte
 node grab.js <dossier> tous 10      # les 10 derniers medias

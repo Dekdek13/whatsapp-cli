@@ -20,3 +20,9 @@ node_modules/
 __pycache__/
 .DS_Store
 Thumbs.db
+
+# Voix de Yanis : personnel, jamais dans le depot public
+VOIX.md
+
+# Etat de auto-reply.js (contient des extraits de conversation)
+.auto-reply-*.json
